@@ -359,7 +359,7 @@ species = ifelse(df4$human[1],'human', 'E. coli')
 df = bind_rows(df1, df2, df3,df4) %>% group_by(protein) %>%
     mutate(sum = recode_factor(as.factor(sum)
                               ,'no summarization' = '1\tno summarization'
-                             , 'high flyers summarization' = '2\thigh flyer summarization'
+                             , 'high flyer summarization' = '2\thigh flyers summarization'
                              , 'maxLFQ summarization' = '3\tmaxLFQ summarization'
                              , 'robust regression summarization' =  '4\trobust regression summarization'
                                )
@@ -371,7 +371,7 @@ df = bind_rows(df1, df2, df3,df4) %>% group_by(protein) %>%
     theme(strip.text = element_text(hjust = 0)) +
       facet_grid(title~sum,scales = 'free_y') +
       theme(axis.text.x = element_text(angle = 55, hjust = 1)
-          , strip.text = element_text(size = 11))
+          , strip.text = element_text(size = 11)) + ylab('log2 intensity')
   p
 
 ggsave(str_glue('protein_comparison_boxplots.png'),p,width=12,height=8)
@@ -592,113 +592,45 @@ p = pd %>%
 p = make_msqrob_plot(results);p
 ggsave('msqrob_ABCD_wo_Q9BZJ0.png', p, width = 10.5, height = 5);p
 
+#########################################
+## Plot intensties from protein Q9BZJ0 ##
+#########################################
+## get intensity data
+ids = 'Q9BZJ0'
+df1= read_rds('../analyses/output/msqrob') %>% select(protein, data,human) %>%
+    filter(protein %in% ids) %>% mutate(sum = 'no summarization') %>% unnest
+df2 = read_rds('../analyses/proteus/proteus_summarized_data.rds')$tab %>% 
+        as_data_frame(rownames = 'protein') %>%
+        gather(sample,expression,-protein) %>%
+        mutate(condition = str_extract(sample, '^.')) %>%
+        filter(protein  %in% ids) %>% mutate(sum = 'high flyer summarization')
+df3 = read_rds('../analyses/output/msqrobsum_maxlfq') %>% select(protein, data) %>%
+    filter(protein %in% ids) %>% mutate(sum = 'maxLFQ summarization') %>% unnest %>% select(-feature)
+df4 = read_rds('../analyses/output/msqrobsum') %>% select(protein, data_summarized) %>%
+    filter(protein %in% ids) %>% mutate(sum = 'robust regression summarization') %>% unnest
 
+species = ifelse(df4$human[1],'human', 'E. coli')
 
+df = bind_rows(df1, df2, df3,df4) %>% group_by(protein) %>%
+    mutate(sum = recode_factor(as.factor(sum)
+                              ,'no summarization' = 'no summarization'
+                             , 'high flyer summarization' = 'high flyers summarization'
+                             , 'maxLFQ summarization' = 'maxLFQ summarization'
+                             , 'robust regression summarization' =  'robust regression summarization'
+                               )
+         , title = str_glue("{ifelse(protein == id1,'A\t',ifelse(protein == id2,'B\t','C\t'))}{ifelse(any(human,na.rm = TRUE),'human', 'E. coli')} protein: {protein}") ) %>%
+    mutate(feature = map_chr(feature,~{paste(rev(str_split(.x,'')[[1]]),collapse = '')}))
 
+  p = ggplot(df) + geom_boxplot(aes(sample,expression,group = condition),outlier.size = -1) +
+    geom_point(aes(sample,expression,colour = as.factor(feature),group = condition)) + guides(colour = 'none') +
+    theme(strip.text = element_text(hjust = 0)) +
+      facet_wrap(~sum,2) +
+      theme(axis.text.x = element_text(angle = 55, hjust = 1)
+          , strip.text = element_text(size = 11)) + ylab('log2 intensity')
+  p
 
-
-
-
+ggsave(str_glue('protein_Q9BZJ0_boxplots.png'),p,width=10,height=7)
 
 ###############################################################
-## Effect of vsb on normalization and batch parameter effect ##
+## Effect of vsn on normalization and batch parameter effect ##
 ###############################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#####################
-## Check failing proteins summarisation c-b
-#####################
-library(here);wd <- here()
-source(paste0(wd, "/R/functions.r"))
-source(paste0(wd, "/R/ionstar_analysis_functions.r"))
-library(MSqRob)
-txt_path = paste0("/home/st/Documents/quant_sum/ionstar_data/txt/")
-fasta_path = '/home/st/Documents/quant_sum/ionstar_data'
-set = read_mq(txt_path,fasta_path) %>% preprocess(norm = 'vsn',logtrans = FALSE)
-protset_rr <- combineFeatures(set,fun="robust", groupBy = fData(set)$protein,cv = FALSE) # 31s
-setdf = MSnSet2df(set)
-protsetdf = MSnSet2df(protset_rr)
-
-id = filter(results, method =='rmm_rr', contrast == 'c-b',human) %>% arrange(qvalue) %>%
-  head(5)
-id2 = filter(results, method =='rmm_lib', contrast == 'c-b',human) %>% arrange(qvalue) %>%
-  left_join(select(id,protein),.)
-
-tit = select(id, protein,pvalue,qvalue,FDP,logFC) %>%
-  left_join(select(id2, protein,pvalue,qvalue,FDP,logFC),by = 'protein') %>%
-  mutate(info = str_glue('{protein}\nMSqRob MSqRobSum
-% qvalue: {round(qvalue.y, 4)*100}\t{round(qvalue.x,4)*100}
-% pvalue: {round(pvalue.y, 4)*100}\t{round(pvalue.x,4)*100}
-logFC: {round(logFC.y, 3)}\t{round(logFC.x,3)}'))
-prot = left_join(select(id,protein),setdf) %>% filter(str_detect(sample, 'c|b'))
-sum = left_join(select(id,protein),protsetdf) %>% filter(str_detect(sample, 'c|b'))
-prot = left_join(prot,tit)
-sum = left_join(sum,tit)
-p = ggplot(prot) +
-  geom_point(aes(sample, expression, colour = feature)) +
-  geom_point(aes(sample, expression), data = sum, shape = 4) +
-  facet_wrap(~info) + guides(colour = FALSE) + geom_vline(xintercept = 4.5) +
-  scale_y_continuous(breaks=seq(1,100,1))
-
-p
-ggsave('expression_bc_FP_human_prot.png', p, width = 10, height = 6)
-
-prot = left_join(select(id,protein),setdf)
-sum = left_join(select(id,protein),protsetdf)
-p = ggplot(prot) +
-  geom_point(aes(sample, expression, colour = feature)) +
-  geom_point(aes(sample, expression), data = sum, shape = 4) +
-  facet_wrap(~protein) + guides(colour = FALSE) + geom_vline(xintercept = c(4.5,8.5,12.5,16.5)) +
-  scale_y_continuous(breaks=seq(1,100,1))
-
-p
-ggsave('expression_abcde_FP_human_prot.png', p, width = 10, height = 6)
-
-#########
-id = filter(results, method =='rmm_rr', contrast == 'c-b',ecoli) %>% arrange(qvalue) %>%
-  head(5)
-
-id2 = filter(results, method =='rmm_lib', contrast == 'c-b',ecoli) %>% arrange(qvalue) %>%
-  left_join(select(id,protein),.)
-
-tit = select(id, protein,qvalue,FDP,logFC) %>%
-  left_join(select(id2, protein,qvalue,FDP,logFC),by = 'protein') %>%
-  mutate(info = str_glue('{protein}\nMSqRob MSqRobSum
-% qvalue: {round(qvalue.y, 4)*100}\t{round(qvalue.x,4)*100}
-logFC: {round(logFC.y, 3)}\t{round(logFC.x,3)}'))
-prot = left_join(select(id,protein),setdf) %>% filter(str_detect(sample, 'c|b'))
-sum = left_join(select(id,protein),protsetdf) %>% filter(str_detect(sample, 'c|b'))
-prot = left_join(prot,tit)
-sum = left_join(sum,tit)
-p = ggplot(prot) +
-  geom_point(aes(sample, expression, colour = feature)) +
-  geom_point(aes(sample, expression), data = sum, shape = 4) +
-  facet_wrap(~info) + guides(colour = FALSE) + geom_vline(xintercept = 4.5) +
-  scale_y_continuous(breaks=seq(1,100,1))
-
-ggsave('expression_bc_FP_ecoli_prot.png', p, width = 14, height = 12);p
-
-#################
