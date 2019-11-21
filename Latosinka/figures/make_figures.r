@@ -39,7 +39,7 @@ ggsave('latosinka_comparisons_all_proteins.pdf',p,width = 5,height = 3.5)
 postscript('latosinka_comparisons_all_proteins.eps', width = 5, height = 3.5);p;dev.off()
 
 
-dp = filter(pd,dataset == 'common proteins') %>% ggplot +
+p = filter(pd,dataset == 'common proteins') %>% ggplot +
   geom_point(aes(qvalue, n_proteins, colour = method), size = .5)+
   geom_line(aes(qvalue, n_proteins, colour = method), size = .3) + xlim(0, .205) + ylim(0,100) +
   geom_vline(xintercept = c(.01,.05),colour = 'grey') +
@@ -156,7 +156,7 @@ p = filter(pd,!msqrob_signif) %>% ggplot + geom_point(aes(msqrob,msqrobsum), col
                  , filter(pd,msqrob_signif)) +
   scale_shape_manual(values = c(1,8,16))
 p = p + theme_bw() +
-  labs(colour = 'theta sample > 0.01', shape = 'Protein significant with\nMSqRobSum'
+  labs(colour = 'theta sample < 0.01', shape = 'Protein significant with\nMSqRobSum'
      , x = 'MSqRob', y = 'MSqRobSum')
 ggsave('Latosinka_msqrob_vs_msqrobsum_teststatistics_ttest_dfmsqrobttestInfo_smallTheta001_alldataGrey.png',p, width = 9, height = 7);p
 

@@ -463,6 +463,7 @@ pd = filter(results
           , method %in% c('msqrob','perseus' ,'msstats','dep_miximp','proteus')) %>%
     mutate(method = recode_factor(method
                                 , 'msqrob' = 'MSqRob'
+                                , 'msqrobsum' = 'MSqRobSum'
                                 , 'perseus' = 'Perseus\n(maxLFQ)'
                                 , 'proteus' = 'proteus\n(high-flyers)'
                                 , 'dep_miximp' = 'DEPmiximp\n(maxLFQ)'
