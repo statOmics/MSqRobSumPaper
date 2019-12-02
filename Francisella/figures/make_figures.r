@@ -6,6 +6,7 @@ res = list.files('../analyses/results', full.names = TRUE) %>%
 res = filter(res, !is.na(qvalue)) %>% group_by(method) %>%
   arrange(pvalue) %>% mutate(n_proteins = row_number(pvalue))
 
+
 ########################################
 ## performance with to or z statistic ##
 ########################################
@@ -18,25 +19,39 @@ r  = group_by(r, method) %>%
   bind_rows(r)
 r = filter(res,method %in% c('original')) %>% bind_rows(r)
 
-p = ungroup(r) %>% mutate(method = recode_factor(method,'original' = 'Ramond et al.'
+cols = tibble::tribble(~method,~col
+                     , 'msqrob_quant' , '#00A9FF'
+                     , 'msqrobsum_quant' , '#000000'
+                     , 'msqrob_quant_z' , '#ABA300'
+                     , 'msqrobsum_quant_z' , '#ED68ED'
+                     , 'original' , '#F8766D'
+                       )
+r = left_join(r,cols)
+
+pd = ungroup(r) %>% mutate(method = recode_factor(method,'original' = 'Ramond et al.'
                                             , 'msqrob_quant' = 'MSqRob (t-test)'
                                             , 'msqrobsum_quant' = 'MSqRobSum (t-test)'
                                             , 'msqrob_quant_z' = 'MSqRob (z-test)'
                                             , 'msqrobsum_quant_z' = 'MSqRobSum (z-test)'
-                                              )) %>%
+                                              ))
+p = pd %>%
   ggplot + geom_line(aes(qvalue, n_proteins, colour = method)) +
   xlim(0, .1) + ylim(0,330) + xlab('False Discovery Rate') + ylab('Number of proteins returned') +theme_bw()
+p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
+
 p
 ggsave('Francisella_performance_z_vs_t_test.png', p, width = 5, height = 3.5);p
 
 
-p = ungroup(r) %>% filter(method %in% c('original', 'msqrob_quant', 'msqrobsum_quant')) %>%
+pd = ungroup(r) %>% filter(method %in% c('original', 'msqrob_quant', 'msqrobsum_quant')) %>%
   mutate(method = recode_factor(method,'original' = 'Ramond et al.'
                               , 'msqrob_quant' = 'MSqRob'
                               , 'msqrobsum_quant' = 'MSqRobSum'
-                                                 )) %>%
+                                ))
+p = pd %>%
   ggplot + geom_line(aes(qvalue, n_proteins, colour = method)) +
   xlim(0, .1) + ylim(0,330) + xlab('False Discovery Rate') + ylab('Number of proteins returned') +theme_bw()
+p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
 p
 ggsave('Francisella_performance.png', p, width = 5, height = 3.5);p
 postscript('Francisella_performance.eps', width = 5, height = 3.5);p;dev.off()

@@ -24,6 +24,20 @@ out = msqrobsum(set, formulas = form, group_vars = c('protein')
 out %>% write_rds(paste0(output_path, 'msqrob'))
 out %>% rmm2res %>% write_rds(paste0(results_path, 'msqrob'))
 
+## future::nbrOfWorkers()
+
+## system.time({out = msqrobsum(set, formulas = form, group_vars = c('protein'), contrasts = 'condition', mode = 'msqrob', parallel_args = list(strategy = "sequential"))}) #326
+## system.time({out = msqrobsum(set, formulas = form, group_vars = c('protein'), contrasts = 'condition', mode = 'msqrob', parallel_args = list(strategy = "multisession"))}) # 1042.432
+## system.time({out = msqrobsum(set, formulas = form, group_vars = c('protein'), contrasts = 'condition', mode = 'msqrob', parallel_args = list(strategy = "multisession", workers = 8))})
+
+## system.time({out = msqrobsum(set, formulas = form, group_vars = c('protein'), contrasts = 'condition', mode = 'msqrob', parallel_args = list(strategy = "multiprocess", workers = 4))})# 1042.432
+
+## packageurl <- 'https://cran.r-project.org/src/contrib/Archive/future/future_1.11.1.1.tar.gz'
+## install.packages(packageurl, repos=NULL, type="source")
+## packageurl <- 'https://cran.r-project.org/src/contrib/Archive/future.apply/future.apply_1.1.0.tar.gz'
+## install.packages(packageurl, repos=NULL, type="source")
+## system.time({out = msqrobsum(set, formulas = form, group_vars = c('protein'), contrasts = 'condition', mode = 'msqrob', parallel_args = list(strategy = "multisession"))}) # 855.4
+## system.time({out = msqrobsum(set, formulas = form, group_vars = c('protein'), contrasts = 'condition', mode = 'msqrob', parallel_args = list(strategy = "multisession", workers = 8L))})
 ###############
 ## MSqRobSum ##
 ###############
@@ -33,7 +47,6 @@ out = msqrobsum(set, formulas = form, group_vars = c('protein')
 
 out %>% write_rds(paste0(output_path, 'msqrobsum'))
 out %>% rmm2res %>% write_rds(paste0(results_path, 'msqrobsum'))
-
 
 #############
 ## Perseus ##

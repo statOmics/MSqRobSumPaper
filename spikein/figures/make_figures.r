@@ -54,6 +54,33 @@ res = list.files('../analyses/results', full.names = TRUE) %>%
 
 results = preprocess_results(res)
 
+## adding fixed colors for each method
+cols = tibble(method = c(
+               'perseus'
+              , 'msstats_noImp'
+              , 'msqrobsum_maxlfq'
+              , 'proteus'
+              , 'msstats_noNorm'
+              , 'msqrob_wo_Q9BZJ0'
+              , 'msstats'
+              , 'perseus_my'
+              , 'msqrobsum_wo_Q9BZJ0'
+              , 'msstats_noImp_noNorm'
+              , 'msqrob'
+              , 'msqrobsum_miximp_pep'
+              , 'dep_miximp'
+              , 'msqrobsum_miximp_prot'
+              , 'msqrobsum_DEP'
+              , 'msqrobsum'
+                         ),
+              methodf = factor(method,levels = method))
+colsp = ggplot(cols, aes(methodf, 1, color = methodf)) + geom_point()
+colsp
+
+cols = transmute(cols,method, col = ggplot_build(colsp)$data[[1]]$colour)
+cols$col[cols$method== 'msqrobsum'] = '#000000'
+results = left_join(results,cols)
+
 ##################
 ## main Figures ##
 ##################
@@ -82,10 +109,10 @@ Fold Change ({map_chr(conditions,~first(.x))}/{map_chr(conditions,~last(.x))}) =
 left_join(pd,.)
   pd$contrast_info = factor(pd$contrast_info, levels = levels(pd$contrast_info)[c(1,2,4,3,5,6,7:10)])
 
-  p1 = ungroup(pd) %>%
+  pd1 = ungroup(pd) %>%
     ## filter(contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
-    filter(contrast %in% c('b-a')) %>%
-    ggplot() + geom_hline(yintercept = 0) +
+    filter(contrast %in% c('b-a'))
+  p1 = pd1 %>% ggplot() + geom_hline(yintercept = 0) +
     geom_hline(aes(yintercept = logFC_real),colour = 'grey',size = 1.5) +
     geom_boxplot(aes(method,logFC,colour = method), outlier.size = 1) +
     facet_wrap(contrast~species,ncol = 2) +
@@ -96,9 +123,10 @@ left_join(pd,.)
     ylab('Log Fold Change') +theme_bw() +
     theme(legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1))
+  p1 = p1 + scale_colour_manual(values = unique(arrange(pd1,method)$col))
 
-  p2 = pd %>%
-    filter(contrast %in% c('b-a','c-b','d-c')) %>%
+  pd2 = pd %>% filter(contrast %in% c('b-a','c-b','d-c'))
+  p2 = pd2 %>%
     ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
     facet_wrap(~contrast_info,ncol = 3) +
     xlim(0,max_FDP) +
@@ -107,6 +135,7 @@ left_join(pd,.)
     ylab('True Positive Rate') +
     guides(colour = 'none') + theme_bw() +
     theme(strip.text = element_text(hjust = 0))
+  p2 = p2 + scale_colour_manual(values = unique(arrange(pd2,method)$col))
   p = cowplot::plot_grid(p2,p1,rel_heights = c(3.5,3), labels = c('A','B'),ncol=1)
   ## p = cowplot::plot_grid(p2,p1,rel_widths = c(11,9), labels = c('A','B'),ncol=2)
   p
@@ -143,8 +172,8 @@ left_join(pd,.)
       filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
       dplyr::slice(1)
 
-p = pd %>%
-  filter(contrast %in% c('b-a','c-b','d-c')) %>%
+pd = pd %>%  filter(contrast %in% c('b-a','c-b','d-c'))
+  p = pd %>%
     ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
     geom_vline(xintercept = .05, colour = 'grey') +
     geom_vline(xintercept = .01, colour = 'grey') +
@@ -157,6 +186,7 @@ p = pd %>%
       theme(strip.text = element_text(hjust = 0)) +
     xlab('False Discovery Proportion') +
     ylab('True Positive Rate')
+  p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
   p +theme(legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1,title.position = 'top'),
            shape = guide_legend(nrow = 1,title.position = 'top'))
@@ -236,9 +266,8 @@ left_join(pd,.)
         filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
         dplyr::slice(1)
 
-    p = pd %>%
-      filter(contrast %in% c('b-a','c-b','d-c')) %>%
-        ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
+    pd = pd %>% filter(contrast %in% c('b-a','c-b','d-c'))
+    p = pd %>% ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
         geom_vline(xintercept = .05, colour = 'grey') +
         geom_vline(xintercept = .01, colour = 'grey') +
         xlim(0,max_FDP) +
@@ -250,6 +279,7 @@ left_join(pd,.)
         theme(strip.text = element_text(hjust = 0)) +
         xlab('False Discovery Proportion') +
         ylab('True Positive Rate')
+    p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
     p + theme(legend.position = 'bottom') +
       guides(colour = guide_legend(nrow = 2,title.position = 'top'),
         shape = guide_legend(nrow = 2,title.position = 'top'))
@@ -315,15 +345,19 @@ df = bind_rows(df1, df2, df3,df4) %>% group_by(protein) %>%
          , title = str_glue("{ifelse(protein == id1,'A\t',ifelse(protein == id2,'B\t','C\t'))}{ifelse(any(human,na.rm = TRUE),'human', 'E. coli')} protein: {protein}") ) %>%
     mutate(feature = map_chr(feature,~{paste(rev(str_split(.x,'')[[1]]),collapse = '')}))
 
+df = ungroup(df) %>% mutate(feature = as.factor(feature))
   p = ggplot(df) + geom_boxplot(aes(sample,expression,group = condition),outlier.size = -1) +
-    geom_point(aes(sample,expression,colour = as.factor(feature),group = condition)) + guides(colour = 'none') +
+    geom_point(aes(sample,expression,colour = feature,group = condition),size = .7) +
+    ## scale_color_brewer(type = "qual", aesthetics = c('colour')) +
+    ## scale_color_brewer(palette = "Pastel2") +
+    guides(colour = 'none') +
     theme(strip.text = element_text(hjust = 0)) +
       facet_grid(title~sum,scales = 'free_y') +
       theme(axis.text.x = element_text(angle = 55, hjust = 1)
           , strip.text = element_text(size = 11)) + ylab('log2 intensity')
-  p = p + theme_bw()
+p = p+ theme_bw()+ theme( axis.text.x=element_blank()) + xlab('Samples')
 p
-ggsave(str_glue('spikein_supl_protein_comparison_boxplots.png'),p,width=12,height=8)
+ggsave(str_glue('spikein_supl_protein_comparison_boxplots.png'),p,width=9.5,height=5.6)
 
 ###########################################################################
 ## improvement plots msstats with or without normalization or imputation ##
@@ -365,9 +399,8 @@ left_join(pd,.)
     filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
     dplyr::slice(1)
 
-  p = pd %>%
-    filter(contrast %in% c('b-a','c-b','d-c')) %>%
-    ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
+  pd = pd %>%  filter(contrast %in% c('b-a','c-b','d-c'))
+  p = pd %>% ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
     geom_vline(xintercept = .05, colour = 'grey') +
     geom_vline(xintercept = .01, colour = 'grey') +
     xlim(0,max_FDP) +
@@ -378,12 +411,13 @@ left_join(pd,.)
     facet_wrap(~contrast_info,ncol = 3) +theme_bw() +
     xlab('False Discovery Proportion') +
     ylab('True Positive Rate')
+  p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
   p + theme_bw() +theme(strip.text = element_text(hjust = 0),legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1,title.position = 'top'),
            shape = guide_legend(nrow = 1,title.position = 'top'))
 }
 
-p = make_msstats_plot(results,.65)
+p = make_msstats_plot(results,.65);p
 ggsave('spikein_supl_msstats_norm_imp_improvement_ABC.png', p, width = 10, height = 5);p
 
 #######################################
@@ -412,9 +446,13 @@ Concentration (% wt/wt): {map_chr(conditions,~first(.x))} = {map_dbl(concentrati
 Fold Change ({map_chr(conditions,~first(.x))}/{map_chr(conditions,~last(.x))}) = {round(FC_real,2)}'))) %>%
 left_join(pd,.)
   pd$contrast_info = factor(pd$contrast_info, levels = levels(pd$contrast_info)[c(1,2,4,3,5,6,7:10)])
+  print(levels(pd$contrast_info))
+  pd$contrast_info = factor(pd$contrast_info, levels = levels(pd$contrast_info)[c(1,4,6,2,3,5,7,8,9,10)])
+  print(levels(pd$contrast_info))
 
-  p1 = pd %>%
-    filter(contrast %in% c('c-a','d-a','d-b')) %>%
+  pd1 = pd %>%
+    filter(contrast %in% c('c-a','d-a','d-b'))
+    p1 = pd1 %>%
     ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
     facet_wrap(~contrast_info,ncol = 3) +
     xlim(0,max_FDP) +
@@ -423,20 +461,23 @@ left_join(pd,.)
     ylab('True Positive Rate') +
     guides(colour = 'none') + theme_bw() +
     theme(strip.text = element_text(hjust = 0))
+  p1 = p1 + scale_colour_manual(values = unique(arrange(pd1,method)$col))
 
   ## Filter out common proteins
-  pd2 = group_by(pd,protein, contrast) %>% filter(n() == 5) %>%
+  pd = group_by(pd,protein, contrast) %>% filter(n() == 5) %>%
     group_by(method, contrast) %>% mutate(qvalue = p.adjust(pvalue, method = 'BH')) %>%
     arrange(pvalue) %>%
     mutate(FDP = cummean(!TP)
          , FPR = cumsum(!TP)/sum(!TP)
          , TPR  = cumsum(TP)/TP_total
          , TP_hits = cumsum(TP)) %>% ungroup
+  pd2 = pd %>%
+    filter(contrast %in% c('b-a','c-b','d-c','c-a','d-a','d-b')) #%>%
+    ## mutate(contrast = recode_factor(contrast, 'b-a' = 'b-a', 'c-a'='c-a','c-b' = 'c-b', 'd-a'='d-a', 'd-c'='d-c', 'd-b'='d-b'))
 
-  p2 = pd2 %>%
-    filter(contrast %in% c('b-a','c-b','d-c','c-a','d-a','d-b')) %>%
+      p2 = pd2 %>%
     ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
-    facet_wrap(~contrast_info,ncol = 3) +
+    facet_wrap(~contrast_info,nrow = 2) +
     xlim(0,max_FDP) +
     ylim(0,max_TPR) +
     xlab('False Discovery Proportion') +
@@ -445,7 +486,7 @@ left_join(pd,.)
     theme(strip.text = element_text(hjust = 0),
           legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1))
-
+  p2 = p2 + scale_colour_manual(values = unique(arrange(pd2,method)$col))
 
   p = cowplot::plot_grid(p1,p2,rel_heights = c(3.5,7.5), labels = c('A','B'),ncol=1)
   p
@@ -460,7 +501,9 @@ ggsave('spikein_supl_introduction_ABCD_common.png', p, width = 8.15, height = 8)
 max_TPR = .8
 max_FDP = .1
 pd = filter(results
-          , method %in% c('msqrob','perseus' ,'msstats','dep_miximp','proteus')) %>%
+          , method %in% c('msqrob'
+                         ,'msqrobsum'
+                         ,'perseus' ,'msstats','dep_miximp','proteus')) %>%
     mutate(method = recode_factor(method
                                 , 'msqrob' = 'MSqRob'
                                 , 'msqrobsum' = 'MSqRobSum'
@@ -482,6 +525,7 @@ p1 = ungroup(pd) %>%
  guides(colour = FALSE) + scale_x_discrete(breaks = NULL) + xlab(NULL)
 p1 = p1 + theme_bw() + theme(legend.position = 'bottom') +
   guides(colour = guide_legend(nrow = 1))
+p1 = p1 + scale_colour_manual(values = unique(arrange(pd,method)$col))
 p1
 ggsave('spikein_supl_introduction_logfc_all.png', p1, width = 11, height = 10)
 
@@ -513,8 +557,8 @@ left_join(pd,.)
       filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
       dplyr::slice(1)
 
-p = pd %>%
-  filter(contrast %in% c('c-a','d-a','d-b')) %>%
+pd = pd %>% filter(contrast %in% c('c-a','d-a','d-b'))
+  p = pd %>%
     ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
     geom_vline(xintercept = .05, colour = 'grey') +
     geom_vline(xintercept = .01, colour = 'grey') +
@@ -527,6 +571,7 @@ p = pd %>%
       theme(strip.text = element_text(hjust = 0)) +
     xlab('False Discovery Proportion') +
     ylab('True Positive Rate')
+  p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
   p +theme(legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1,title.position = 'top'),
            shape = guide_legend(nrow = 1,title.position = 'top'))
@@ -615,6 +660,7 @@ p = pd %>%
       theme(strip.text = element_text(hjust = 0)) +
     xlab('False Discovery Proportion') +
     ylab('True Positive Rate')
+  p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
   p +theme_bw() + theme(strip.text = element_text(hjust = 0),legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1,title.position = 'top'),
            shape = guide_legend(nrow = 1,title.position = 'top'))
@@ -669,6 +715,58 @@ ggsave('spikein_supl_overspiking_rmm_vs_rmm_rr.png', p, width = 10, height = 8);
 ###############################################################
 ## Effect of vsn on normalization and batch parameter effect ##
 ################V###############################################
+make_msqrob_plot = function(results,max_TPR = .8){
+  max_FDP = .1
+  pd = filter(results
+            , method %in% c('msqrobsum'
+                          , 'msqrob_wo_Q9BZJ0'
+                          , 'msqrobsum_wo_Q9BZJ0'
+                          )) %>%
+    mutate(method = recode_factor(method
+                                , 'msqrob' = 'MSqRob', 'msqrobsum' = 'MSqRobSum'
+                                , 'msqrob_wo_Q9BZJ0' = 'MSqRob\nwithout Q9BZJ0'
+                                , 'msqrobsum_wo_Q9BZJ0' = 'MSqRobSum\nwithout Q9BZJ0'
+                                  )) %>%
+    mutate(contrast = factor(contrast,
+                             levels = c("b-a", "c-a", "d-a", "e-a", "c-b", "d-b", "d-c", "e-b", "e-c", "e-d")))
+
+  pd = group_by(pd,contrast,FC_real) %>% summarise_at(vars(conditions,concentrations),~{list(first(.x))}) %>%
+    ungroup %>% transmute(contrast,contrast_info = factor(
+                                     str_glue('{contrast}
+Concentration (% wt/wt): {map_chr(conditions,~first(.x))} = {map_dbl(concentrations,~{first(.x) %>% round(2)})}%, {map_chr(conditions,~last(.x))} = {map_dbl(concentrations,~{last(.x) %>% round(2)})}%
+Fold Change ({map_chr(conditions,~first(.x))}/{map_chr(conditions,~last(.x))}) = {round(FC_real,2)}'))) %>%
+left_join(pd,.)
+  pd$contrast_info = factor(pd$contrast_info, levels = levels(pd$contrast_info)[c(1,2,4,3,5,6,7:10)])
+
+  q = filter(pd,contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
+      mutate('1%' = .01,'5%' = .05) %>% gather(fdr, fdr_value, '1%', '5%') %>%
+      group_by(method, contrast,fdr) %>%
+      filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
+      dplyr::slice(1)
+
+p = pd %>%
+    filter(contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
+    ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
+    geom_vline(xintercept = .05, colour = 'grey') +
+    geom_vline(xintercept = .01, colour = 'grey') +
+    xlim(0,max_FDP) +
+    ylim(0,max_TPR) +
+      geom_point(aes(FDP,TPR,colour = method,shape = fdr),data = q,width = .002,fill = 'white',
+                 height = .002,size = 2)+
+    scale_shape_manual(name = 'FDR',values = c('1%' = 21, '5%' = 24)) +
+    facet_wrap(~contrast_info,ncol = 3) +
+      theme(strip.text = element_text(hjust = 0)) +
+    xlab('False Discovery Proportion') +
+    ylab('True Positive Rate')
+  p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
+  p +theme_bw() + theme(strip.text = element_text(hjust = 0),legend.position = 'bottom') +
+    guides(colour = guide_legend(nrow = 1,title.position = 'top'),
+           shape = guide_legend(nrow = 1,title.position = 'top'))
+}
+p = make_msqrob_plot(results);p
+
+ggsave('spikein_supl_vsn_vs_no_norm_batch_effect_ABCD', p, width = 8.2, height = 6);p
+
 
 #####################
 ## rest of improvement plots
@@ -710,8 +808,8 @@ left_join(pd,.)
         filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
         dplyr::slice(1)
 
-    p = pd %>%
-      filter(contrast %in% c('c-a','d-a','d-b')) %>%
+    pd = pd %>% filter(contrast %in% c('c-a','d-a','d-b'))
+        p = pd %>%
         ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
         geom_vline(xintercept = .05, colour = 'grey') +
         geom_vline(xintercept = .01, colour = 'grey') +
@@ -724,6 +822,7 @@ left_join(pd,.)
         theme(strip.text = element_text(hjust = 0)) +
         xlab('False Discovery Proportion') +
         ylab('True Positive Rate')
+    p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
     p + theme(legend.position = 'bottom') +
       guides(colour = guide_legend(nrow = 2,title.position = 'top'),
         shape = guide_legend(nrow = 2,title.position = 'top'))
@@ -760,31 +859,27 @@ Fold Change ({map_chr(conditions,~first(.x))}/{map_chr(conditions,~last(.x))}) =
 left_join(pd,.)
   pd$contrast_info = factor(pd$contrast_info, levels = levels(pd$contrast_info)[c(1,2,4,3,5,6,7:10)])
 
-  q.01 = group_by(pd, method, contrast) %>%
-    filter(contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
-    filter(qvalue == max(qvalue[qvalue < .01])) %>% arrange(pvalue) %>%
+  q = filter(pd,contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
+    mutate('1%' = .01,'5%' = .05) %>% gather(fdr, fdr_value, '1%', '5%') %>%
+    group_by(method, contrast,fdr) %>%
+    filter(qvalue == max(qvalue[qvalue < fdr_value])) %>% arrange(pvalue) %>%
     dplyr::slice(1)
 
-  q.05 = group_by(pd, method, contrast) %>%
-    filter(contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
-    filter(qvalue == max(qvalue[qvalue < .05])) %>% arrange(pvalue) %>%
-    dplyr::slice(1)
-
-  p = pd %>%
-    filter(contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c')) %>%
+  pd = pd %>% filter(contrast %in% c('b-a','c-a','d-a','c-b','d-b','d-c'))
+    p = pd %>%
     ggplot(aes(FDP,TPR,colour = method))+ geom_path() +
     geom_vline(xintercept = .05, colour = 'grey') +
     geom_vline(xintercept = .01, colour = 'grey') +
     xlim(0,max_FDP) +
     ylim(0,max_TPR) +
-    geom_point(aes(FDP,TPR,colour = method),data = q.05,width = .002, shape = 24,fill = 'white',
-               height = .002,size = 2)+
-    geom_point(aes(FDP,TPR,colour = method),data = q.01,width = .002, shape = 21,fill = 'white',
-               height = .002,size = 2) +
+      geom_point(aes(FDP,TPR,colour = method,shape = fdr),data = q,width = .002,fill = 'white',
+                 height = .002,size = 2)+
+      scale_shape_manual(name = 'FDR',values = c('1%' = 21, '5%' = 24)) +
     facet_wrap(~contrast_info,ncol = 3) +
     theme(strip.text = element_text(hjust = 0)) +
     xlab('False Discovery Proportion') +
     ylab('True Positive Rate')
+  p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
   p +theme_bw() + theme(strip.text = element_text(hjust = 0),legend.position = 'bottom') +
     guides(colour = guide_legend(nrow = 1,title.position = 'top'),
            shape = guide_legend(nrow = 1,title.position = 'top'))

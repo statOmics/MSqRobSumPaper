@@ -7,6 +7,17 @@ res = list.files('../analyses/results', full.names = TRUE) %>%
 res = filter(res,!is.na(pvalue)) %>% group_by(method) %>%
   arrange(pvalue) %>% mutate(n_proteins = row_number(pvalue))
 
+cols = tibble::tribble(~method,~col
+                      ,'msqrob', '#00A9FF'
+                      ,'msqrobsum', '#000000'
+                      ,'dep_miximp', '#C77CFF'
+                      ,'msstats', '#00BE67'
+                      ,'msqrob_quant', '#00BFC4'
+                      ,'msqrobsum_quant', '#00B8E7'
+                     , 'perseus', '#ABA300'
+                       )
+res = left_join(res,cols)
+
 #######################################
 ## performance plot on same proteins ##
 #######################################
@@ -25,6 +36,7 @@ pd = ungroup(pd) %>%
                                 ))
 
 p = pd %>% ggplot + geom_point(aes(qvalue, n_proteins, colour = method))+ geom_line(aes(qvalue, n_proteins, colour = method)) + xlim(0, .5) + ylim(0,100) + facet_grid(~dataset) + geom_vline(xintercept = c(.01,.05),colour = 'grey')
+p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
 p
 ggsave('latosinka_comparisons_commonVSall_proteins.pdf',p,width = 12,height = 8)
 
@@ -34,10 +46,10 @@ p = filter(pd,dataset != 'common proteins') %>% ggplot +
   geom_vline(xintercept = c(.01,.05),colour = 'grey') +
   xlab('False Discovery Rate') +
   ylab('Number of proteins returned') + theme_bw()
+p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
 p
 ggsave('latosinka_comparisons_all_proteins.pdf',p,width = 5,height = 3.5)
 postscript('latosinka_comparisons_all_proteins.eps', width = 5, height = 3.5);p;dev.off()
-
 
 p = filter(pd,dataset == 'common proteins') %>% ggplot +
   geom_point(aes(qvalue, n_proteins, colour = method), size = .5)+
@@ -45,6 +57,7 @@ p = filter(pd,dataset == 'common proteins') %>% ggplot +
   geom_vline(xintercept = c(.01,.05),colour = 'grey') +
   xlab('False Discovery Rate') +
   ylab('Number of proteins returned') + theme_bw()
+p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
 p
 ggsave('latosinka_comparisons_common_proteins.pdf',p,width = 5,height = 3.5)
 
@@ -60,7 +73,11 @@ pd = ungroup(pd) %>%
                               , 'msstats' = 'MSstats'
                                 ))
 
-p = pd %>% ggplot + geom_point(aes(qvalue, n_proteins, colour = method))+ geom_line(aes(qvalue, n_proteins, colour = method)) + xlim(0, .5) + ylim(0,100) + facet_grid(~dataset) + geom_vline(xintercept = c(.01,.05),colour = 'grey')
+p = pd %>% ggplot + geom_point(aes(qvalue, n_proteins, colour = method)) +
+  geom_line(aes(qvalue, n_proteins, colour = method)) +
+  xlim(0, .5) + ylim(0,100) + facet_grid(~dataset) +
+  geom_vline(xintercept = c(.01,.05),colour = 'grey')
+p = p + scale_colour_manual(values = unique(arrange(pd,method)$col))
 p
 ggsave('latosinka_comparisons_commonVSall_proteins_witquant.pdf',p,width = 12,height = 8)
 
